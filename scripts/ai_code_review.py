@@ -174,7 +174,7 @@ def request_model(diff: str) -> list[dict[str, Any]]:
             env=env,
             text=True,
             capture_output=True,
-            timeout=180,
+            timeout=600,
             check=False,
         )
         if result.returncode != 0:
