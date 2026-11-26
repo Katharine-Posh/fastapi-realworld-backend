@@ -11,3 +11,6 @@ __pycache__
 .coverage
 google_credentials.json
 ./test.py
+
+
+**/AI_CODE_REVIEW_SETUP.md
