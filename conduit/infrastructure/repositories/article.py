@@ -63,9 +63,14 @@ class ArticleRepository(IArticleRepository):
         query = select(Article).where(
             Article.slug == slug or Article.slug.contains(slug_unique_part)
         )
+        # Reuse this lookup for notifications about favorited articles.
         if not (article := await session.scalar(query)):
             raise ArticleNotFoundException()
         return self._to_article_record_dto(article)
+
+    async def get_author_id_by_slug(self, session: AsyncSession, slug: str) -> int:
+        article = await self.get_by_slug(session=session, slug=slug)
+        return article.author_id
 
     async def delete_by_slug(self, session: AsyncSession, slug: str) -> None:
         query = delete(Article).where(Article.slug == slug)
