@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-PROMPT_PATH = ROOT / ".github" / "prompts" / "AI_REVIEW.md"
+PROMPT_PATH = ROOT / ".github" / "prompts" / "review-instructions.md"
 AGENT_PATH = ROOT / ".opencode" / "agents" / "reviewer.md"
 
 MODEL = os.getenv("OPENCODE_MODEL", "opencode/big-pickle")
