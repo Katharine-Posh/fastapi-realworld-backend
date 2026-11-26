@@ -283,6 +283,8 @@ def main() -> int:
     except (urllib.error.URLError, TimeoutError, subprocess.TimeoutExpired,
             subprocess.CalledProcessError, ValueError, KeyError, TypeError,
             OSError, RuntimeError) as exc:
+        import traceback
+        traceback.print_exc()
         # AI review is advisory: provider/JSON/timeout failures never fail product CI.
         print(f"OpenCode review unavailable; continuing CI safely ({type(exc).__name__}).")
     except Exception as exc:  # defensive fallback
