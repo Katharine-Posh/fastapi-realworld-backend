@@ -287,7 +287,7 @@ def main() -> int:
         print(exc)
         traceback.print_exc()
         # AI review is advisory: provider/JSON/timeout failures never fail product CI.
-        print(f"OpenCode review unavailable; continuing CI safely ({type(exc).__name__}).")
+        print(f"OpenCode review unavailable; continuing CI safely ({exc}).")
     except Exception as exc:  # defensive fallback
         print(f"OpenCode review fallback: unexpected {type(exc).__name__}; continuing CI.")
 
