@@ -443,7 +443,11 @@ def split_diff_into_chunks(diff, max_chars=CHUNK_CHAR_LIMIT):
 
 def parse_model_json(text):
     if not isinstance(text, str) or not text.strip():
+<<<<<<< HEAD
         raise ValueError("Groq returned an empty response")
+=======
+        raise RuntimeError("Groq returned an empty response")
+>>>>>>> b672c250d53b3da47888e814eb0f914289c8dbc6
 
     cleaned = text.strip()
 
@@ -458,6 +462,7 @@ def parse_model_json(text):
         cleaned,
     )
 
+<<<<<<< HEAD
     start = cleaned.find("{")
     end = cleaned.rfind("}")
 
@@ -470,11 +475,35 @@ def parse_model_json(text):
 
     if not isinstance(parsed, dict):
         raise ValueError("Invalid JSON object")
+=======
+    try:
+        parsed = json.loads(cleaned)
+
+    except json.JSONDecodeError:
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+
+        if start == -1 or end <= start:
+            raise RuntimeError(
+                "Groq response does not contain JSON"
+            )
+
+        parsed = json.loads(cleaned[start:end + 1])
+
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Groq returned an invalid JSON object")
+>>>>>>> b672c250d53b3da47888e814eb0f914289c8dbc6
 
     findings = parsed.get("findings")
 
     if not isinstance(findings, list):
+<<<<<<< HEAD
         raise ValueError("Missing findings array")
+=======
+        raise RuntimeError(
+            "Groq response is missing the findings array"
+        )
+>>>>>>> b672c250d53b3da47888e814eb0f914289c8dbc6
 
     return findings
 
@@ -507,22 +536,38 @@ def request_model(diff):
         return []
 
     print(f"Diff divided into {len(chunks)} chunks")
+<<<<<<< HEAD
+=======
+    print(f"Chunk size limit: {CHUNK_CHAR_LIMIT} characters")
+>>>>>>> b672c250d53b3da47888e814eb0f914289c8dbc6
 
     all_findings = []
 
     for index, chunk in enumerate(chunks, start=1):
         print(f"Reviewing chunk {index}/{len(chunks)}")
+<<<<<<< HEAD
 
         prompt = build_prompt(chunk)
         chunk_success = False
 
         for attempt in range(MAX_RETRIES + 1):
             try:
+=======
+        print(f"Chunk length: {len(chunk)} characters")
+
+        prompt = build_prompt(chunk)
+
+        for attempt in range(MAX_RETRIES + 1):
+            try:
+                # Uses the same Responses API pattern as the
+                # user's working Groq example.
+>>>>>>> b672c250d53b3da47888e814eb0f914289c8dbc6
                 response = client.responses.create(
                     input=prompt,
                     model=MODEL,
                 )
 
+<<<<<<< HEAD
                 raw_text = response.output_text
 
                 try:
@@ -560,6 +605,11 @@ Review the same diff again and return the complete result.
                         "invalid JSON after all retries."
                     )
                     break
+=======
+                findings = parse_model_json(
+                    response.output_text
+                )
+>>>>>>> b672c250d53b3da47888e814eb0f914289c8dbc6
 
                 all_findings.extend(findings)
 
@@ -568,14 +618,28 @@ Review the same diff again and return the complete result.
                     f"{len(findings)} finding(s)"
                 )
 
+<<<<<<< HEAD
                 chunk_success = True
+=======
+>>>>>>> b672c250d53b3da47888e814eb0f914289c8dbc6
                 break
 
             except APIStatusError as exc:
                 status = exc.status_code
 
+<<<<<<< HEAD
                 if (
                     status in (413, 429, 500, 502, 503, 504)
+=======
+                if status == 413:
+                    raise RuntimeError(
+                        f"Groq rejected chunk {index} with HTTP 413. "
+                        "Reduce CHUNK_CHAR_LIMIT to 3000."
+                    ) from None
+
+                if (
+                    status in (429, 500, 502, 503, 504)
+>>>>>>> b672c250d53b3da47888e814eb0f914289c8dbc6
                     and attempt < MAX_RETRIES
                 ):
                     delay = min(2 ** (attempt + 1), 15)
@@ -588,11 +652,18 @@ Review the same diff again and return the complete result.
                     time.sleep(delay)
                     continue
 
+<<<<<<< HEAD
                 print(
                     f"Chunk {index} failed: "
                     f"Groq HTTP {status}: {str(exc)[:1000]}"
                 )
                 break
+=======
+                raise RuntimeError(
+                    f"Groq API HTTP {status}: "
+                    f"{str(exc)[:1500]}"
+                ) from None
+>>>>>>> b672c250d53b3da47888e814eb0f914289c8dbc6
 
             except (
                 APITimeoutError,
@@ -602,13 +673,18 @@ Review the same diff again and return the complete result.
                     delay = min(2 ** (attempt + 1), 15)
 
                     print(
+<<<<<<< HEAD
                         f"Connection error. "
+=======
+                        f"Groq connection error. "
+>>>>>>> b672c250d53b3da47888e814eb0f914289c8dbc6
                         f"Retrying in {delay}s..."
                     )
 
                     time.sleep(delay)
                     continue
 
+<<<<<<< HEAD
                 print(f"Chunk {index} connection failed: {exc}")
                 break
 
@@ -622,8 +698,30 @@ Review the same diff again and return the complete result.
             print(
                 f"Chunk {index} skipped. "
                 "Continuing with the next chunk."
-            )
+=======
+                raise RuntimeError(
+                    f"Groq connection failed: {exc}"
+                ) from None
 
+            except (
+                ValueError,
+                KeyError,
+                TypeError,
+            ) as exc:
+                raise RuntimeError(
+                    f"Could not parse Groq response: {exc}"
+                ) from None
+
+        # Stay below the observed TPM limit by spacing requests.
+        if index < len(chunks):
+            print(
+                f"Waiting {GROQ_REQUEST_INTERVAL}s "
+                "before the next Groq request..."
+>>>>>>> b672c250d53b3da47888e814eb0f914289c8dbc6
+            )
+            time.sleep(GROQ_REQUEST_INTERVAL)
+
+<<<<<<< HEAD
         if index < len(chunks):
             print(
                 f"Waiting {GROQ_REQUEST_INTERVAL}s "
@@ -656,7 +754,34 @@ Review the same diff again and return the complete result.
     )
 
     return unique_findings[:20]
+=======
+    # Deduplicate findings.
+    unique_findings = []
+    seen = set()
 
+    for finding in all_findings:
+        if not isinstance(finding, dict):
+            continue
+
+        key = (
+            finding.get("file"),
+            finding.get("line"),
+            finding.get("title"),
+        )
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+        unique_findings.append(finding)
+
+    return unique_findings[:20]
+
+>>>>>>> b672c250d53b3da47888e814eb0f914289c8dbc6
+
+# ============================================================
+# DIFF VALIDATION
+# ============================================================
 
 # ============================================================
 # DIFF VALIDATION
