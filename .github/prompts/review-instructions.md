@@ -28,18 +28,31 @@ and regressions.
 - Keep each finding concise: explain the problem, impact, and concrete fix direction.
 
 ## Output contract
-Return exactly this JSON object, with no prose or Markdown fences:
+
+Your entire response MUST be exactly one valid JSON object.
+
+Do not use Markdown fences.
+Do not add explanations before or after the JSON.
+Do not return plain text.
+
+Required structure:
 
 {
   "comments": [
     {
       "path": "relative/path/to/file.py",
       "line": 123,
-      "severity": "medium",
-      "body": "Explain the concrete defect and its impact, then suggest a fix."
+      "severity": "high",
+      "body": "Description of the concrete issue and suggested fix."
     }
   ]
 }
+
+If there are no actionable findings, return:
+{"comments":[]}
+
+The comments field MUST always be an array.
+Do not include additional fields.
 
 The `line` must be a new-file line number from an added line in the diff.
 Do not return more than 20 findings. Do not include fields beyond those shown.
