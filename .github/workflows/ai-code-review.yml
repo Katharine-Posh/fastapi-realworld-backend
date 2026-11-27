@@ -1,4 +1,4 @@
-name: AI code review (OpenCode)
+name: AI code review (Groq)
 
 on:
   pull_request_target:
@@ -9,18 +9,17 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: opencode-review-${{ github.event.pull_request.number }}
+  group: groq-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   ai-review:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
-      # IMPORTANT: check out only the trusted base commit.
-      # Never check out or execute code from the PR head in this workflow.
+      # Checkout only trusted base-branch code. Never checkout or execute PR code.
       - name: Checkout trusted base revision
         uses: actions/checkout@v4
         with:
@@ -28,6 +27,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # Fetch the PR head only as Git objects for diff generation.
       - name: Fetch PR head as Git data only
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -35,25 +35,15 @@ jobs:
           git fetch --no-tags origin \
             "+refs/pull/${PR_NUMBER}/head:refs/remotes/pull/${PR_NUMBER}/head"
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: Install OpenCode CLI
-        run: |
-          npm install --global @opencode/cli
-          opencode --version
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Run advisory AI review
+      - name: Run advisory Groq AI review
         env:
-          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-          OPENCODE_MODEL: opencode/deepseek-v4.1-flash-free
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: openai/gpt-oss-120b
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
@@ -63,4 +53,6 @@ jobs:
           AI_REVIEW_MAX_DIFF_CHARS: "50000"
           AI_REVIEW_MAX_FILES: "40"
           AI_REVIEW_MAX_COMMENTS: "20"
+          GROQ_API_TIMEOUT_SECONDS: "120"
+          GROQ_API_MAX_RETRIES: "3"
         run: python scripts/ai_code_review.py

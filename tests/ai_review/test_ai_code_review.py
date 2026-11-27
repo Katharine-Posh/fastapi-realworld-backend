@@ -31,3 +31,47 @@ def test_ignores_generated_lock_and_binary_files():
 
 def test_empty_patch_has_no_lines():
     assert review.changed_new_lines("") == set()
+
+
+
+def test_validate_model_result_accepts_expected_schema():
+    result = review.validate_model_result({
+        "comments": [{
+            "path": "conduit/api/routes/article.py",
+            "line": 42,
+            "severity": "high",
+            "body": "The ownership check is missing.",
+        }]
+    })
+    assert result == [{
+        "path": "conduit/api/routes/article.py",
+        "line": 42,
+        "severity": "high",
+        "body": "The ownership check is missing.",
+    }]
+
+
+def test_validate_model_result_rejects_invalid_fields():
+    result = review.validate_model_result({
+        "comments": [
+            {
+                "path": "../outside.py",
+                "line": 2,
+                "severity": "high",
+                "body": "Invalid path will be filtered against the diff later.",
+            },
+            {
+                "path": "conduit/api/routes/article.py",
+                "line": True,
+                "severity": "high",
+                "body": "Boolean is not a valid line number.",
+            },
+            {
+                "path": "conduit/api/routes/article.py",
+                "line": 42,
+                "severity": "urgent",
+                "body": "Unsupported severity.",
+            },
+        ]
+    })
+    assert result == []
