@@ -443,7 +443,7 @@ def split_diff_into_chunks(diff, max_chars=CHUNK_CHAR_LIMIT):
 
 def parse_model_json(text):
     if not isinstance(text, str) or not text.strip():
-        raise RuntimeError("Groq returned an empty response")
+        raise ValueError("Groq returned an empty response")
 
     cleaned = text.strip()
 
@@ -458,29 +458,23 @@ def parse_model_json(text):
         cleaned,
     )
 
-    try:
-        parsed = json.loads(cleaned)
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
 
-    except json.JSONDecodeError:
-        start = cleaned.find("{")
-        end = cleaned.rfind("}")
+    if start == -1 or end <= start:
+        raise ValueError("Groq response does not contain JSON")
 
-        if start == -1 or end <= start:
-            raise RuntimeError(
-                "Groq response does not contain JSON"
-            )
+    cleaned = cleaned[start:end + 1]
 
-        parsed = json.loads(cleaned[start:end + 1])
+    parsed = json.loads(cleaned)
 
     if not isinstance(parsed, dict):
-        raise RuntimeError("Groq returned an invalid JSON object")
+        raise ValueError("Invalid JSON object")
 
     findings = parsed.get("findings")
 
     if not isinstance(findings, list):
-        raise RuntimeError(
-            "Groq response is missing the findings array"
-        )
+        raise ValueError("Missing findings array")
 
     return findings
 
@@ -513,28 +507,59 @@ def request_model(diff):
         return []
 
     print(f"Diff divided into {len(chunks)} chunks")
-    print(f"Chunk size limit: {CHUNK_CHAR_LIMIT} characters")
 
     all_findings = []
 
     for index, chunk in enumerate(chunks, start=1):
         print(f"Reviewing chunk {index}/{len(chunks)}")
-        print(f"Chunk length: {len(chunk)} characters")
 
         prompt = build_prompt(chunk)
+        chunk_success = False
 
         for attempt in range(MAX_RETRIES + 1):
             try:
-                # Uses the same Responses API pattern as the
-                # user's working Groq example.
                 response = client.responses.create(
                     input=prompt,
                     model=MODEL,
                 )
 
-                findings = parse_model_json(
-                    response.output_text
-                )
+                raw_text = response.output_text
+
+                try:
+                    findings = parse_model_json(raw_text)
+
+                except (json.JSONDecodeError, ValueError) as exc:
+                    print(
+                        f"Invalid JSON in chunk {index}: {exc}"
+                    )
+
+                    if attempt < MAX_RETRIES:
+                        print("Retrying with stricter JSON instructions...")
+
+                        prompt += """
+
+IMPORTANT: Your previous response was invalid JSON.
+
+Return a valid JSON object.
+Requirements:
+- Use double quotes for all JSON keys and strings.
+- Escape special characters correctly.
+- Do not use trailing commas.
+- Do not add Markdown fences.
+- Do not add explanations outside JSON.
+- Return exactly this structure:
+{"findings":[]}
+
+Review the same diff again and return the complete result.
+"""
+                        time.sleep(2)
+                        continue
+
+                    print(
+                        f"Skipping chunk {index}: "
+                        "invalid JSON after all retries."
+                    )
+                    break
 
                 all_findings.extend(findings)
 
@@ -543,19 +568,14 @@ def request_model(diff):
                     f"{len(findings)} finding(s)"
                 )
 
+                chunk_success = True
                 break
 
             except APIStatusError as exc:
                 status = exc.status_code
 
-                if status == 413:
-                    raise RuntimeError(
-                        f"Groq rejected chunk {index} with HTTP 413. "
-                        "Reduce CHUNK_CHAR_LIMIT to 3000."
-                    ) from None
-
                 if (
-                    status in (429, 500, 502, 503, 504)
+                    status in (413, 429, 500, 502, 503, 504)
                     and attempt < MAX_RETRIES
                 ):
                     delay = min(2 ** (attempt + 1), 15)
@@ -568,10 +588,11 @@ def request_model(diff):
                     time.sleep(delay)
                     continue
 
-                raise RuntimeError(
-                    f"Groq API HTTP {status}: "
-                    f"{str(exc)[:1500]}"
-                ) from None
+                print(
+                    f"Chunk {index} failed: "
+                    f"Groq HTTP {status}: {str(exc)[:1000]}"
+                )
+                break
 
             except (
                 APITimeoutError,
@@ -581,31 +602,32 @@ def request_model(diff):
                     delay = min(2 ** (attempt + 1), 15)
 
                     print(
-                        f"Groq connection error. "
+                        f"Connection error. "
                         f"Retrying in {delay}s..."
                     )
 
                     time.sleep(delay)
                     continue
 
-                raise RuntimeError(
-                    f"Groq connection failed: {exc}"
-                ) from None
+                print(f"Chunk {index} connection failed: {exc}")
+                break
 
-            except (
-                ValueError,
-                KeyError,
-                TypeError,
-            ) as exc:
-                raise RuntimeError(
-                    f"Could not parse Groq response: {exc}"
-                ) from None
+            except Exception as exc:
+                print(
+                    f"Chunk {index} failed: {exc}"
+                )
+                break
 
-        # Stay below the observed TPM limit by spacing requests.
+        if not chunk_success:
+            print(
+                f"Chunk {index} skipped. "
+                "Continuing with the next chunk."
+            )
+
         if index < len(chunks):
             print(
                 f"Waiting {GROQ_REQUEST_INTERVAL}s "
-                "before the next Groq request..."
+                "before the next request..."
             )
             time.sleep(GROQ_REQUEST_INTERVAL)
 
@@ -628,6 +650,10 @@ def request_model(diff):
 
         seen.add(key)
         unique_findings.append(finding)
+
+    print(
+        f"Total findings collected: {len(unique_findings)}"
+    )
 
     return unique_findings[:20]
 
