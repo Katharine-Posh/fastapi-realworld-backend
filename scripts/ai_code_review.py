@@ -12,6 +12,7 @@ from pathlib import Path
 from openai import OpenAI
 from openai import APIConnectionError, APIStatusError, APITimeoutError
 
+# this guy just asks me for some gemini even tho the script doesn't even mention it
 
 MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
