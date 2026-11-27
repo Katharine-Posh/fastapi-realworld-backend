@@ -32,9 +32,9 @@ def env_int(name, default):
 MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
-MAX_DIFF_CHARS = env_int("AI_REVIEW_MAX_DIFF_CHARS", 60000)
+MAX_DIFF_CHARS = env_int("AI_REVIEW_MAX_DIFF_CHARS", 100000)
 CHUNK_CHAR_LIMIT = env_int("AI_REVIEW_CHUNK_CHARS", 12000)
-MAX_CHUNKS = env_int("AI_REVIEW_MAX_CHUNKS", 8)
+MAX_CHUNKS = env_int("AI_REVIEW_MAX_CHUNKS", 10)
 MAX_OUTPUT_TOKENS = env_int("AI_REVIEW_MAX_OUTPUT_TOKENS", 4096)
 MAX_RETRIES = env_int("AI_REVIEW_MAX_RETRIES", 2)
 REQUEST_TIMEOUT = env_int("AI_REVIEW_TIMEOUT_SECONDS", 120)
@@ -426,9 +426,11 @@ def split_hunk(header, lines, max_chars):
 
 
 def split_diff_into_chunks(diff, max_chars=CHUNK_CHAR_LIMIT):
-    """Split the diff without losing file names or original line numbers."""
+    """Pack diff hunks into bounded chunks, preserving file headers and line numbers."""
     sections = re.split(r"(?=^FILE: )", diff, flags=re.MULTILINE)
     chunks = []
+    current_chunk = None
+    current_size = 0
 
     for section in sections:
         if not section.strip():
@@ -461,17 +463,33 @@ def split_diff_into_chunks(diff, max_chars=CHUNK_CHAR_LIMIT):
         if current_header is not None:
             hunks.append((current_header, current_lines))
 
-        current_chunk = file_header
-        current_size = len(current_chunk)
+        header_in_current = False
 
         for hunk_header, hunk_lines in hunks:
             for piece in split_hunk(hunk_header, hunk_lines, max_chars):
                 piece_size = len(piece) + 1
 
-                if (
-                    current_size > len(file_header)
-                    and current_size + piece_size > max_chars
-                ):
+                if current_chunk is None:
+                    current_chunk = file_header
+                    current_size = len(current_chunk)
+                    header_in_current = True
+
+                elif not header_in_current:
+                    # A new file starts inside an existing chunk: include its
+                    # FILE/STATUS/PATCH header before the first hunk.
+                    needed = len(file_header) + 1 + piece_size
+
+                    if current_size + needed > max_chars:
+                        chunks.append(current_chunk)
+                        current_chunk = file_header
+                        current_size = len(current_chunk)
+                    else:
+                        current_chunk += "\n" + file_header
+                        current_size += len(file_header) + 1
+
+                    header_in_current = True
+
+                elif current_size + piece_size > max_chars:
                     chunks.append(current_chunk)
                     current_chunk = file_header
                     current_size = len(current_chunk)
@@ -479,8 +497,8 @@ def split_diff_into_chunks(diff, max_chars=CHUNK_CHAR_LIMIT):
                 current_chunk += "\n" + piece
                 current_size += piece_size
 
-        if current_size > len(file_header):
-            chunks.append(current_chunk)
+    if current_chunk is not None:
+        chunks.append(current_chunk)
 
     if len(chunks) > MAX_CHUNKS:
         print(

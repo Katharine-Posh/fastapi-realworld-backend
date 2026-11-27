@@ -46,8 +46,9 @@ jobs:
           GROQ_MODEL: openai/gpt-oss-20b
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
+          AI_REVIEW_MAX_DIFF_CHARS: "100000"
           AI_REVIEW_CHUNK_CHARS: "12000"
-          AI_REVIEW_MAX_CHUNKS: "8"
+          AI_REVIEW_MAX_CHUNKS: "10"
           AI_REVIEW_MAX_OUTPUT_TOKENS: "4096"
           AI_REVIEW_CHUNK_PAUSE_SECONDS: "5"
         run: python scripts/ai_code_review.py

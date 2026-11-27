@@ -78,6 +78,32 @@ def test_split_diff_into_chunks_keeps_file_header():
     assert "@@ -1,1 +1,2 @@" in chunks[0]
 
 
+def test_split_diff_into_chunks_packs_small_files_together():
+    diff = DIFF + (
+        "\n\nFILE: second.py\nSTATUS: modified\nPATCH:\n"
+        "@@ -1,1 +1,2 @@\n-old = 1\n+new = 2\n+extra = 3\n"
+    )
+
+    chunks = review.split_diff_into_chunks(diff, max_chars=2000)
+
+    assert len(chunks) == 1
+    assert "FILE: good.py" in chunks[0]
+    assert "FILE: second.py" in chunks[0]
+
+
+def test_split_diff_into_chunks_flushes_when_limit_is_reached():
+    diff = DIFF + (
+        "\n\nFILE: second.py\nSTATUS: modified\nPATCH:\n"
+        "@@ -1,1 +1,2 @@\n-old = 1\n+new = 2\n+extra = 3\n"
+    )
+
+    chunks = review.split_diff_into_chunks(diff, max_chars=150)
+
+    assert len(chunks) == 2
+    assert "FILE: good.py" in chunks[0]
+    assert "FILE: second.py" in chunks[1]
+
+
 def test_get_added_lines_tracks_added_lines_only():
     diff = (
         "\n\nFILE: example.py\nSTATUS: modified\nPATCH:\n"
