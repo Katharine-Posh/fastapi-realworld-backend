@@ -15,8 +15,8 @@ GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
 
 MAX_DIFF_CHARS = 60000
-MAX_RETRIES = 3
-REQUEST_TIMEOUT = 90
+MAX_RETRIES = 2
+REQUEST_TIMEOUT = 60
 
 GITHUB_API = "https://api.github.com"
 
