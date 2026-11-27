@@ -22,6 +22,9 @@ class IArticleRepository(abc.ABC):
     async def get_by_slug(self, session: Any, slug: str) -> ArticleRecordDTO: ...
 
     @abc.abstractmethod
+    async def get_author_id_by_slug(self, session: Any, slug: str) -> int: ...
+
+    @abc.abstractmethod
     async def delete_by_slug(self, session: Any, slug: str) -> None: ...
 
     @abc.abstractmethod

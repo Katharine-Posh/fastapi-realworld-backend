@@ -183,6 +183,13 @@ class ProfileNotFollowedFollowedException(BaseInternalException):
     _message = "Profile was not followed."
 
 
+class NotificationNotFoundException(BaseInternalException):
+    """Exception raised when notification not found for current recipient."""
+
+    _status_code = 404
+    _message = "Notification with this id does not exist."
+
+
 class RateLimitExceededException(BaseInternalException):
     """Exception raised when rate limit exceeded during specific time."""
 
