@@ -16,7 +16,7 @@ jobs:
   review:
     name: Groq Code Review
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       # Используем только доверенный код из base branch.
