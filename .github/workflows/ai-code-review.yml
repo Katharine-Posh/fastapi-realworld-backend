@@ -14,14 +14,13 @@ concurrency:
 
 jobs:
   review:
-    name: Gemini Code Review
+    name: Groq Code Review
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
-      # IMPORTANT:
-      # Use only trusted code from the base branch.
-      # Never checkout or execute code from the PR head.
+      # Используем только доверенный код из base branch.
+      # Не checkout-им и не запускаем код из PR.
       - name: Checkout base repository
         uses: actions/checkout@v4
         with:
@@ -33,10 +32,13 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Run Gemini code review
+      - name: Install OpenAI SDK
+        run: python -m pip install --upgrade openai
+
+      - name: Run Groq code review
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: openai/gpt-oss-20b
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GEMINI_MODEL: gemini-3.8-flash
           GITHUB_EVENT_PATH: ${{ github.event_path }}
         run: python scripts/ai_code_review.py
