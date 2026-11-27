@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
-MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
 
 MAX_DIFF_CHARS = 60000
 MAX_RETRIES = 3
