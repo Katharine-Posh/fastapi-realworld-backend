@@ -111,19 +111,34 @@ def collect_diff(base: str, head: str) -> tuple[str, dict[str, set[int]]]:
     return "\n".join(chunks), allowed
 
 
-def extract_json_object(output: str) -> dict[str, Any]:
-    """Parse the first valid JSON object, tolerating accidental code fences."""
+def extract_json_object(raw: str) -> dict:
+    if not raw or not raw.strip():
+        raise ValueError("OpenCode returned empty stdout")
+
     decoder = json.JSONDecoder()
-    for index, char in enumerate(output):
+    text = raw.strip().lstrip("\ufeff")
+
+    # Ищем JSON-объект в любом месте ответа.
+    for index, char in enumerate(text):
         if char != "{":
             continue
+
         try:
-            value, _ = decoder.raw_decode(output[index:])
+            parsed, _ = decoder.raw_decode(text[index:])
         except json.JSONDecodeError:
             continue
-        if isinstance(value, dict) and isinstance(value.get("comments"), list):
-            return value
-    raise ValueError("OpenCode did not return the required JSON object")
+
+        if (
+            isinstance(parsed, dict)
+            and isinstance(parsed.get("comments"), list)
+        ):
+            return parsed
+
+    preview = text[:1000].replace("\n", "\\n")
+    raise ValueError(
+        "OpenCode did not return the required JSON object. "
+        f"stdout length={len(raw)}; preview={preview!r}"
+    )
 
 
 def request_model(diff: str) -> list[dict[str, Any]]:
@@ -177,6 +192,19 @@ def request_model(diff: str) -> list[dict[str, Any]]:
             timeout=600,
             check=False,
         )
+
+        print(f"OpenCode exit code: {result.returncode}")
+        print(f"OpenCode stdout length: {len(result.stdout)}")
+        print(f"OpenCode stderr length: {len(result.stderr)}")
+
+        if result.stderr:
+            print("OpenCode stderr preview:")
+            print(result.stderr[:3000])
+
+        if result.stdout:
+            print("OpenCode stdout preview:")
+            print(result.stdout[:3000])
+
         if result.returncode != 0:
             # Do not print provider output; it may contain private source context.
             raise RuntimeError(f"OpenCode exited with status {result.returncode}")
