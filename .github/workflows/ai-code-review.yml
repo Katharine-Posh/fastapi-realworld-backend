@@ -16,7 +16,7 @@ jobs:
   review:
     name: Gemini Code Review
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
 
     steps:
       # IMPORTANT:
