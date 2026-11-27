@@ -1,4 +1,5 @@
-name: AI code review (Groq)
+
+name: AI Code Review
 
 on:
   pull_request_target:
@@ -9,50 +10,34 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: groq-review-${{ github.event.pull_request.number }}
+  group: ai-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
-  ai-review:
-    if: github.event.pull_request.draft == false
+  review:
+    name: Gemini Code Review
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
 
     steps:
-      # Checkout only trusted base-branch code. Never checkout or execute PR code.
-      - name: Checkout trusted base revision
+      # IMPORTANT:
+      # Use only trusted code from the base branch.
+      # Never checkout or execute code from the PR head.
+      - name: Checkout base repository
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.sha }}
-          fetch-depth: 0
           persist-credentials: false
-
-      # Fetch the PR head only as Git objects for diff generation.
-      - name: Fetch PR head as Git data only
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          git fetch --no-tags origin \
-            "+refs/pull/${PR_NUMBER}/head:refs/remotes/pull/${PR_NUMBER}/head"
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Run advisory Groq AI review
+      - name: Run Gemini code review
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GROQ_MODEL: openai/gpt-oss-120b
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          GEMINI_MODEL: gemini-2.5-flash
           GITHUB_EVENT_PATH: ${{ github.event_path }}
-          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          AI_REVIEW_MAX_DIFF_CHARS: "50000"
-          AI_REVIEW_MAX_FILES: "40"
-          AI_REVIEW_MAX_COMMENTS: "20"
-          GROQ_API_TIMEOUT_SECONDS: "120"
-          GROQ_API_MAX_RETRIES: "3"
         run: python scripts/ai_code_review.py
